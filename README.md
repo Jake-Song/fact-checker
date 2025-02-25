@@ -1,4 +1,4 @@
-# 🕵️ Fact Checker Agent
+# 🕵️ Fact Check Agent
 팩트 체크를 위한 에이전트 앱입니다.
 3개의 에이전트로 구성되어 있습니다. 
 - 검색 키워드 생성 에이전트(search_keyword_agent)
