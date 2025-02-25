@@ -39,10 +39,21 @@ verdict_agent = Agent(
 )
 
 def fact_check(claim):
-    search_keyword = search_keyword_agent.generate(claim)
-    search_result = search_agent.generate(search_keyword)
-    verdict = verdict_agent.generate(search_result)
-    return verdict
+    total_tokens = 0
+    search_keyword, tokens = search_keyword_agent.generate(claim)
+    print(f"search_keyword: {search_keyword}, \n\ntokens: {tokens}")
+    total_tokens += tokens
+
+    search_result, tokens = search_agent.generate(search_keyword)
+    print(f"search_result: {search_result}, \n\ntokens: {tokens}")
+    total_tokens += tokens
+
+    verdict, tokens = verdict_agent.generate(search_result)
+    print(f"verdict: {verdict}, \n\ntokens: {tokens}")
+    total_tokens += tokens
+
+    print(f"\n\ntotal tokens: {total_tokens}")
+    return search_keyword, search_result, verdict, total_tokens
     
 st.title("Fact Checker")
 st.write("Enter a claim and check if it is true or false with credible sources from the web.")
@@ -51,7 +62,13 @@ claim = st.text_area("Enter your claim:", value="")
 
 if st.button("Check Fact"):
     with st.spinner("Checking..."):
-        response = fact_check(claim)
-        st.subheader("Generated Text")
-        st.write(response)
+        search_keyword, search_result, verdict, total_tokens = fact_check(claim)
+        st.subheader("1. Search Keyword:")
+        st.write(search_keyword)
+        st.subheader("2. Search Result:")
+        st.write(search_result)
+        st.subheader("3. Verdict:")
+        st.write(verdict)
+        st.subheader("Total tokens:")
+        st.write(total_tokens)
   

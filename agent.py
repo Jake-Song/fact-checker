@@ -15,6 +15,19 @@ class Message:
     content: str
     metadata: Optional[Dict[str, Any]] = None
 
+# helper
+def dict_to_serializable(obj):
+    if isinstance(obj, dict):
+        return {k: dict_to_serializable(v) for k, v in obj.items()}
+    elif hasattr(obj, '__dict__'):
+        return dict_to_serializable(obj.__dict__)
+    elif isinstance(obj, (list, tuple)):
+        return [dict_to_serializable(i) for i in obj]
+    elif isinstance(obj, (int, float, str, bool, type(None))):
+        return obj
+    else:
+        return str(obj)
+        
 class LLMProvider(ABC):
     @abstractmethod
     def generate(self, prompt: str, **kwargs) -> str:
@@ -26,16 +39,17 @@ class OpenAIProvider(LLMProvider):
         self.client = OpenAI()
         self.model = model
 
-    def generate(self, prompt: List[Message], **kwargs) -> tuple[str | dict, bool]:
+    def generate(self, prompt: List[Message], max_tokens: int = 100, **kwargs) -> tuple[str | dict, str, bool]:
         response = self.client.chat.completions.create(
             model=self.model,
             messages=prompt,
+            max_tokens=max_tokens,
             **kwargs
         )
         if response.choices[0].message.tool_calls is None:
-            return response.choices[0].message.content, False
+            return response.choices[0].message.content, response.usage.total_tokens, False
         else:
-            return response.choices[0].message, True
+            return response.choices[0].message, response.usage.total_tokens, True
         
 class Tool:
     def __init__(
@@ -60,52 +74,67 @@ class Agent:
 
     def generate(self, prompt: str, **kwargs) -> str:
         self.messages.append({"role": "user", "content": prompt})
-
+        total_tokens = 0
         if self.tool:
-            completion, is_tool_call = self.llm.generate(
+            completion, tokens, is_tool_call = self.llm.generate(
                 prompt=self.messages,
                 tools=self.tool.description
             )
-            
+            total_tokens += tokens
+
             if is_tool_call:
                 self.messages.append(completion)
-                print('tool call start: ', self.messages)
+
+                # Just pretty print the messages
+                serializable_dict = dict_to_serializable(self.messages)
+                print('tool call start: ')                
+                print(json.dumps(serializable_dict, indent=2, ensure_ascii=False))
 
                 if len(completion.tool_calls) > 1:
                     for tool_call in completion.tool_calls:
                         args = json.loads(tool_call.function.arguments)
                         result = self.tool.function(args["query"])
-                        print('search result: ', result)
+                        print('search result: ')
+                        print(json.dumps(result, indent=2, ensure_ascii=False))
                         self.messages.append({                             
                             "role": "tool",
                             "tool_call_id": tool_call.id,
                             "content": str(result)
                         })
-                    print('multiple tool call: ', self.messages)
+                    # Just pretty print the messages
+                    serializable_dict = dict_to_serializable(self.messages)
+                    print('multiple tool call: ')
+                    print(json.dumps(serializable_dict, indent=2, ensure_ascii=False))
                 else:
                     tool_call = completion.tool_calls[0]
                     args = json.loads(tool_call.function.arguments)
                     result = self.tool.function(args["query"])
-                    print('search result: ', result)
+                    print('search result: ')
+                    print(json.dumps(result, indent=2, ensure_ascii=False))
                     self.messages.append({                             
                         "role": "tool",
                         "tool_call_id": tool_call.id,
                         "content": str(result)
                     })
-                    print('single tool call: ', self.messages)
+                    # Just pretty print the messages
+                    serializable_dict = dict_to_serializable(self.messages)
+                    print('single tool call: ')
+                    print(json.dumps(serializable_dict, indent=2, ensure_ascii=False))
                     
-                completion_2, _ = self.llm.generate(
+                completion_2, tokens, _ = self.llm.generate(
                     prompt=self.messages,
                 )
+                total_tokens += tokens
 
-                return completion_2
+                return completion_2, total_tokens
             else:
-                return completion
+                return completion, total_tokens
         else:
-            completion, _ = self.llm.generate(
+            completion, tokens, _ = self.llm.generate(
                 prompt=self.messages                
             )
-            return completion
+            total_tokens += tokens
+            return completion, total_tokens
         
 def search_tavily(query, max_results=2, **kwargs):
     response = tavily_client.search(
