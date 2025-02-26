@@ -39,7 +39,7 @@ class OpenAIProvider(LLMProvider):
         self.client = OpenAI()
         self.model = model
 
-    def generate(self, prompt: List[Message], max_tokens: int = 100, **kwargs) -> tuple[str | dict, str, bool]:
+    def generate(self, prompt: List[Message], max_tokens: int = 1000, **kwargs) -> tuple[str | dict, str, bool]:
         response = self.client.chat.completions.create(
             model=self.model,
             messages=prompt,
@@ -136,7 +136,7 @@ class Agent:
             total_tokens += tokens
             return completion, total_tokens
         
-def search_tavily(query, max_results=2, **kwargs):
+def search_tavily(query, max_results=3, **kwargs):
     response = tavily_client.search(
         query=query,
         max_results=max_results,
